@@ -1,0 +1,439 @@
+get_sportVU <- function (year.season_start = 2015, season_type = "Regular Season", per_mode = "PerGame", pt_measure_type = "Possessions",
+                            type = "Player", last_n_games = 0, location = NA, opponent = NA, team = NA, outcome = NA) {
+  packages <- c("dplyr", "magrittr", "jsonlite", "tidyr", "purrr", "purrr", "stringr", "lubridate", "tidyr")
+  options(warn = -1)
+  lapply(packages, library, character.only = T)
+  get_header_names <- function(headers) {
+    headers_df <- get_headers()
+    actual_names <- 1:length(headers) %>%
+      map(function(x) data_frame(name.actual = headers_df %>% 
+                                   mutate(name.nba = name.nba) %>% dplyr::filter(name.nba == headers[x]) %>% .$name.actual)) %>% 
+      bind_rows()
+    actual_headers <- actual_names
+    return(actual_headers)
+  }
+  get_headers <- function() {
+    headers_df <- data_frame(name.nba = c("PLAYER_ID", "SEASON_ID", 
+                                          "LEAGUE_ID", "TEAM_ID", "TEAM_ABBREVIATION", "PLAYER_AGE", 
+                                          "GP", "GS", "MIN", "FGM", "FGA", "FG_PCT", "FG3M", 
+                                          "FG3A", "FG3_PCT", "FTM", "FTA", "FT_PCT", "OREB", 
+                                          "DREB", "REB", "AST", "STL", "BLK", "TOV", "PF", 
+                                          "PTS", "ORGANIZATION_ID", "SCHOOL_NAME", "RANK_MIN", 
+                                          "RANK_FGM", "RANK_FGA", "RANK_FG_PCT", "RANK_FG3M", 
+                                          "RANK_FG3A", "RANK_FG3_PCT", "RANK_FTM", "RANK_FTA", 
+                                          "RANK_FT_PCT", "RANK_OREB", "RANK_DREB", "RANK_REB", 
+                                          "RANK_AST", "RANK_STL", "RANK_BLK", "RANK_TOV", 
+                                          "RANK_PTS", "RANK_EFF", "PLUS_MINUS", "WL", "MATCHUP", 
+                                          "VIDEO_AVAILABLE", "GAME_DATE", "Game_ID", "PERSON_ID", 
+                                          "FIRST_NAME", "LAST_NAME", "DISPLAY_FIRST_LAST", 
+                                          "DISPLAY_LAST_COMMA_FIRST", "DISPLAY_FI_LAST", "BIRTHDATE", 
+                                          "SCHOOL", "COUNTRY", "LAST_AFFILIATION", "HEIGHT", 
+                                          "WEIGHT", "SEASON_EXP", "JERSEY", "POSITION", "ROSTERSTATUS", 
+                                          "TEAM_NAME", "TEAM_CODE", "TEAM_CITY", "PLAYERCODE", 
+                                          "FROM_YEAR", "TO_YEAR", "DLEAGUE_FLAG", "GAMES_PLAYED_FLAG", 
+                                          "PLAYER_NAME", "TimeFrame", "PIE", "AGE", "W", "L", 
+                                          "W_PCT", "BLKA", "PFD", "DD2", "TD3", "CFID", "CFPARAMS", 
+                                          "OFF_RATING", "DEF_RATING", "NET_RATING", "AST_PCT", 
+                                          "AST_TO", "AST_RATIO", "OREB_PCT", "DREB_PCT", "REB_PCT", 
+                                          "TM_TOV_PCT", "EFG_PCT", "TS_PCT", "USG_PCT", "PACE", 
+                                          "FGM_PG", "FGA_PG", "PTS_OFF_TOV", "PTS_2ND_CHANCE", 
+                                          "PTS_FB", "PTS_PAINT", "OPP_PTS_OFF_TOV", "OPP_PTS_2ND_CHANCE", 
+                                          "OPP_PTS_FB", "OPP_PTS_PAINT", "PCT_FGA_2PT", "PCT_FGA_3PT", 
+                                          "PCT_PTS_2PT", "PCT_PTS_2PT_MR", "PCT_PTS_3PT", 
+                                          "PCT_PTS_FB", "PCT_PTS_FT", "PCT_PTS_OFF_TOV", "PCT_PTS_PAINT", 
+                                          "PCT_AST_2PM", "PCT_UAST_2PM", "PCT_AST_3PM", "PCT_UAST_3PM", 
+                                          "PCT_AST_FGM", "PCT_UAST_FGM", "PCT_FGM", "PCT_FGA", 
+                                          "PCT_FG3M", "PCT_FG3A", "PCT_FTM", "PCT_FTA", "PCT_OREB", 
+                                          "PCT_DREB", "PCT_REB", "PCT_AST", "PCT_TOV", "PCT_STL", 
+                                          "PCT_BLK", "PCT_BLKA", "PCT_PF", "PCT_PFD", "PCT_PTS", 
+                                          "GAME_ID", "START_POSITION", "COMMENT", "TO", "STARTERS_BENCH", 
+                                          "AST_TOV", "FTA_RATE", "OPP_EFG_PCT", "OPP_FTA_RATE", 
+                                          "OPP_TOV_PCT", "OPP_OREB_PCT", "EVENTNUM", "EVENTMSGTYPE", 
+                                          "EVENTMSGACTIONTYPE", "PERIOD", "WCTIMESTRING", 
+                                          "PCTIMESTRING", "HOMEDESCRIPTION", "NEUTRALDESCRIPTION", 
+                                          "VISITORDESCRIPTION", "SCORE", "SCOREMARGIN", "PERSON1TYPE", 
+                                          "PLAYER1_ID", "PLAYER1_NAME", "PLAYER1_TEAM_ID", 
+                                          "PLAYER1_TEAM_CITY", "PLAYER1_TEAM_NICKNAME", "PLAYER1_TEAM_ABBREVIATION", 
+                                          "PERSON2TYPE", "PLAYER2_ID", "PLAYER2_NAME", "PLAYER2_TEAM_ID", 
+                                          "PLAYER2_TEAM_CITY", "PLAYER2_TEAM_NICKNAME", "PLAYER2_TEAM_ABBREVIATION", 
+                                          "PERSON3TYPE", "PLAYER3_ID", "PLAYER3_NAME", "PLAYER3_TEAM_ID", 
+                                          "PLAYER3_TEAM_CITY", "PLAYER3_TEAM_NICKNAME", "PLAYER3_TEAM_ABBREVIATION", 
+                                          "SPD", "DIST", "ORBC", "DRBC", "RBC", "TCHS", "SAST", 
+                                          "FTAST", "PASS", "CFGM", "CFGA", "CFG_PCT", "UFGM", 
+                                          "UFGA", "UFG_PCT", "DFGM", "DFGA", "DFG_PCT", "TEAM_NICKNAME", 
+                                          "FAN_DUEL_PTS", "JERSEY_NUM", "PLAYER_POSITION", 
+                                          "LOCATION", "EVENT_NUM", "HOME_PCT", "VISITOR_PCT", 
+                                          "HOME_PTS", "VISITOR_PTS", "HOME_SCORE_MARGIN", 
+                                          "SECONDS_REMAINING", "HOME_POSS_IND", "HOME_G", 
+                                          "DESCRIPTION", "ISVISIBLE", "HOME_TEAM_ID", "HOME_TEAM_ABR", 
+                                          "HOME_TEAM_PTS", "VISITOR_TEAM_ID", "VISITOR_TEAM_ABR", 
+                                          "VISITOR_TEAM_PTS", "GAME_DATE_EST", "GAME_SEQUENCE", 
+                                          "GAME_STATUS_ID", "GAME_STATUS_TEXT", "GAMECODE", 
+                                          "SEASON", "LIVE_PERIOD", "LIVE_PC_TIME", "NATL_TV_BROADCASTER_ABBREVIATION", 
+                                          "LIVE_PERIOD_TIME_BCAST", "WH_STATUS", "LARGEST_LEAD", 
+                                          "LEAD_CHANGES", "TIMES_TIED", "ids.officials", "officials", 
+                                          "jerseys.official", "id.team", "players.inactive", 
+                                          "id.players.inactive", "ATTENDANCE", "GAME_TIME", 
+                                          "TEAM_CITY_NAME", "TEAM_WINS_LOSSES", "PTS_QTR1", 
+                                          "PTS_QTR2", "PTS_QTR3", "PTS_QTR4", "PTS_OT1", "PTS_OT2", 
+                                          "PTS_OT3", "PTS_OT4", "PTS_OT5", "PTS_OT6", "PTS_OT7", 
+                                          "PTS_OT8", "PTS_OT9", "PTS_OT10", "LAST_GAME_ID", 
+                                          "LAST_GAME_DATE_EST", "LAST_GAME_HOME_TEAM_ID", 
+                                          "LAST_GAME_HOME_TEAM_CITY", "LAST_GAME_HOME_TEAM_NAME", 
+                                          "LAST_GAME_HOME_TEAM_ABBREVIATION", "LAST_GAME_HOME_TEAM_POINTS", 
+                                          "LAST_GAME_VISITOR_TEAM_ID", "LAST_GAME_VISITOR_TEAM_CITY", 
+                                          "LAST_GAME_VISITOR_TEAM_NAME", "LAST_GAME_VISITOR_TEAM_CITY1", 
+                                          "LAST_GAME_VISITOR_TEAM_POINTS", "HOME_TEAM_WINS", 
+                                          "HOME_TEAM_LOSSES", "SERIES_LEADER", "VIDEO_AVAILABLE_FLAG", 
+                                          "PT_AVAILABLE", "PT_XYZ_AVAILABLE", "Player_ID",
+                                          "CATCH_SHOOT_FGM", "CATCH_SHOOT_FGA", "CATCH_SHOOT_FG_PCT", "CATCH_SHOOT_PTS",
+                                          "CATCH_SHOOT_FG3M", "CATCH_SHOOT_FG3A", "CATCH_SHOOT_FG3_PCT","CATCH_SHOOT_EFG_PCT",
+                                          "DEF_RIM_FGM", "DEF_RIM_FGA", "DEF_RIM_FG_PCT",
+                                          "DRIVES", "DRIVE_FGM", "DRIVE_FGA", "DRIVE_FG_PCT", "DRIVE_FTM", "DRIVE_FTA",
+                                          "DRIVE_FT_PCT", "DRIVE_PTS", "DRIVE_PTS_PCT", "DRIVE_PASSES", "DRIVE_PASSES_PCT", 
+                                          "DRIVE_AST", "DRIVE_AST_PCT", "DRIVE_TOV", "DRIVE_TOV_PCT", "DRIVE_PF", "DRIVE_PF_PCT",
+                                          "PASSES_MADE", "PASSES_RECEIVED", "FT_AST", "SECONDARY_AST", "POTENTIAL_AST",
+                                          "AST_POINTS_CREATED", "AST_ADJ", "AST_TO_PASS_PCT", "AST_TO_PASS_PCT_ADJ",
+                                          "POINTS", "TOUCHES", "FRONT_CT_TOUCHES", "TIME_OF_POSS",
+                                          "AVG_SEC_PER_TOUCH", "AVG_DRIB_PER_TOUCH", "PTS_PER_TOUCH", "ELBOW_TOUCHES",
+                                          "POST_TOUCHES", "PAINT_TOUCHES", "PTS_PER_ELBOW_TOUCH", "PTS_PER_POST_TOUCH", 
+                                          "PTS_PER_PAINT_TOUCH", "PULL_UP_FGM", "PULL_UP_FGA", "PULL_UP_FG_PCT", "PULL_UP_FG3M", 
+                                          "PULL_UP_FG3A", "PULL_UP_FG3_PCT", "PULL_UP_PTS", "PULL_UP_EFG_PCT",
+                                          "OREB_CONTEST", "OREB_UNCONTEST", "OREB_CONTEST_PCT", "OREB_CHANCES", "OREB_CHANCE_PCT",
+                                          "OREB_CHANCE_DEFER", "OREB_CHANCE_PCT_ADJ", "AVG_OREB_DIST",
+                                          "DREB_CONTEST", "DREB_UNCONTEST", "DREB_CONTEST_PCT", "DREB_CHANCES", "DREB_CHANCE_PCT",
+                                          "DREB_CHANCE_DEFER", "DREB_CHANCE_PCT_ADJ", "AVG_DREB_DIST",
+                                          "REB_CONTEST", "REB_UNCONTEST", "REB_CONTEST_PCT", "REB_CHANCES", "REB_CHANCE_PCT",
+                                          "REB_CHANCE_DEFER", "REB_CHANCE_PCT_ADJ", "AVG_REB_DIST", "ELBOW_TOUCH_FGM", "ELBOW_TOUCH_FGA", 
+                                          "ELBOW_TOUCH_FG_PCT", "ELBOW_TOUCH_FTM", "ELBOW_TOUCH_FTA", "ELBOW_TOUCH_FT_PCT", "ELBOW_TOUCH_PTS",
+                                          "ELBOW_TOUCH_PTS_PCT", "ELBOW_TOUCH_PASSES", "ELBOW_TOUCH_PASSES_PCT", "ELBOW_TOUCH_AST", "ELBOW_TOUCH_AST_PCT",
+                                          "ELBOW_TOUCH_TOV", "ELBOW_TOUCH_TOV_PCT", "ELBOW_TOUCH_FOULS", "ELBOW_TOUCH_FOULS_PCT", "POST_TOUCH_FGM", 
+                                          "POST_TOUCH_FGA", "POST_TOUCH_FG_PCT", "POST_TOUCH_FTM", "POST_TOUCH_FTA", "POST_TOUCH_FT_PCT", "POST_TOUCH_PTS",
+                                          "POST_TOUCH_PTS_PCT", "POST_TOUCH_PASSES", "POST_TOUCH_PASSES_PCT", "POST_TOUCH_AST", "POST_TOUCH_AST_PCT",
+                                          "POST_TOUCH_TOV", "POST_TOUCH_TOV_PCT", "POST_TOUCH_FOULS", "POST_TOUCH_FOULS_PCT","PAINT_TOUCH_FGM", 
+                                          "PAINT_TOUCH_FGA", "PAINT_TOUCH_FG_PCT", "PAINT_TOUCH_FTM", "PAINT_TOUCH_FTA", "PAINT_TOUCH_FT_PCT", 
+                                          "PAINT_TOUCH_PTS", "PAINT_TOUCH_PTS_PCT", "PAINT_TOUCH_PASSES", "PAINT_TOUCH_PASSES_PCT", "PAINT_TOUCH_AST", 
+                                          "PAINT_TOUCH_AST_PCT", "PAINT_TOUCH_TOV", "PAINT_TOUCH_TOV_PCT", "PAINT_TOUCH_FOULS", "PAINT_TOUCH_FOULS_PCT"), 
+                             name.actual = c("id.player", "code.season", "id.league", 
+                                             "id.team", "slug.team", "age.player", "gp", 
+                                             "gs", "min", "fgm", "fga", "pct.fg", "fg3m", 
+                                             "fg3a", "pct.fg3", "ftm", "fta", "pct.ft", "oreb", 
+                                             "dreb", "reb", "ast", "stl", "blk", "tov", "fouls", 
+                                             "pts", "id.organization", "name.school", "rank.min", 
+                                             "rank.fgm", "rank.fga", "rank.pct.fg", "rank.fg3m", 
+                                             "rank.fg3a", "rank.pct.fg3", "rank.ftm", "rank.fta", 
+                                             "rank.pct.ft", "rank.oreb", "rank.dreb", "rank_reb", 
+                                             "rank.ast", "rank.stl", "rank.blk", "rank.tov", 
+                                             "rank.pts", "rank.eff", "plus.minus", "wl", 
+                                             "matchup", "is.video_available", "date.game", 
+                                             "id.game", "id.player", "name.first", "name.last", 
+                                             "name.player", "name.last.display", "name.middle.display", 
+                                             "date.birth", "school", "country", "college.non_nba_team", 
+                                             "height", "weight.lbs", "years.experience", 
+                                             "jersey", "position", "status.roster", "team", 
+                                             "code.team", "city.team", "slug.player", "year.from", 
+                                             "year.to", "has.d_league_data", "gp.flag", "name.player", 
+                                             "id.season", "pie", "age", "wins", "losses", 
+                                             "pct.wins", "fga.blocked", "fouls.drawn", "double_doubles", 
+                                             "triple_doubles", "cfid", "cfparms", "ortg", 
+                                             "drtg", "netrtg", "pct.ast", "ratio.ast.to", 
+                                             "ratio.ast", "pct.oreb", "pct.dreb", "pct.reb", 
+                                             "ratio.to", "pct.efg", "pct.ts", "pct.usg", 
+                                             "pace", "fgm.per_game", "fga.per_game", "pts.off_to", 
+                                             "pts.2nd_chance", "pts.fastbreak", "pts.paint", 
+                                             "pts.off_to.opponent", "pts.2nd_chance.opponent", 
+                                             "pts.fastbreak.opponent", "pts.paint.opponent", 
+                                             "pct.fga2a", "pct.fga3a", "pct.pts.fg2m", "pct.pts.mid_range_2", 
+                                             "pct.pts.fg3m", "pct.pts.fast_break", "pct.pts.ft", 
+                                             "pct.pts.off_tos", "pct.paints.paint", "pct.fg2m.assisted", 
+                                             "pct.fg2m.unassisted", "pct.fg3m.assisted", 
+                                             "pct.fg3m.unassisted", "pct.fgm.assisted", "pct.fgm.unassisted", 
+                                             "pct.fgm", "pct.fga", "pct.fg3m", "pct.fg3a", 
+                                             "pct.ftm", "pct.fta", "pct.oreb", "pct.dreb", 
+                                             "pct.reb", "pct.ast", "pct.tov", "pct.stl", 
+                                             "pct.blk", "pct.blocked", "pct.fouls", "pct.fouls.drawn", 
+                                             "pct.pts", "id.game", "id.position.start", "comment", 
+                                             "tov", "starter_bench", "ratio.ast.to", "rate.fta", 
+                                             "pct.efg.opponent", "rate.fta.opponent", "rate.tov.opponent", 
+                                             "pct.oreb.opponent", "id.event", "id.type.type", 
+                                             "id.action.type", "period", "time", "minute.quarter", 
+                                             "play.home.description", "play.neutral.description", 
+                                             "play.visitor.description", "score", "score.margin", 
+                                             "type.player.1", "id.player.1", "name.player.1", 
+                                             "id.team.player.1", "city.team.player.1", "name.team.player.1", 
+                                             "slug.team.player.1", "type.player.2", "id.player.2", 
+                                             "name.player.2", "id.team.player.2", "city.team.player.2", 
+                                             "name.team.player.2", "slug.team.player.2", 
+                                             "type.player.3", "id.player.3", "name.player.3", 
+                                             "id.team.player.3", "city.team.player.3", "name.team.player.3", 
+                                             "slug.team.player.3", "avg.mph", "distance.miles", 
+                                             "oreb.chances", "dreb.chances", "reb.chances", 
+                                             "touches", "ast.secondary", "ast.to.fta", "passes", 
+                                             "fgm.contested", "fga.contested", "pct.fg.contested", 
+                                             "fgm.uncontested", "fga.uncontested", "pct.fg.uncontested", 
+                                             "fgm.opponent.rim_defense", "fga.opponent.rim_defense", 
+                                             "pct.fgm.opponent.rim_defense", "name.team", 
+                                             "points.fanduel", "jersey", "position", "location", 
+                                             "id.event", "pct.win_prob.home", "pct.win_prob.away", 
+                                             "points.home", "points.away", "score.margin.home", 
+                                             "quarter.seconds_remaining", "is.home.possesion", 
+                                             "home.g", "play", "is.visible", "id.team.home", 
+                                             "slug.team.home", "points.team.home", "id.team.away", 
+                                             "slug.team.away", "points.team.away", "date.game", 
+                                             "sequence.game", "id.stats.game", "text.status.game", 
+                                             "slug.game", "year.season_start", "period.live", 
+                                             "time.live.pc", "network.tv", "period.live.broadcast", 
+                                             "status.wh", "lead.largest", "lead.changes", 
+                                             "times.tied", "ids.officials", "officials", 
+                                             "jerseys.official", "id.team", "players.inactive", 
+                                             "id.players.inactive", "attendance", "time.game", 
+                                             "city.team", "record.team", "points.q1", "points.q2", 
+                                             "points.q3", "points.q4", "points.ot.1", "points.ot.2", 
+                                             "points.ot.3", "points.ot.4", "points.ot.5", 
+                                             "points.ot.6", "points.ot.7", "points.ot.8", 
+                                             "points.ot.9", "points.ot.10", "id.game.last", 
+                                             "date.game.last", "id.team.home.last", "city.team.home.last", 
+                                             "name.team.home.last", "slug.team.home.last", 
+                                             "points.team.home.last", "id.team.away.last", 
+                                             "city.team.away.last", "name.team.away.last", 
+                                             "slug.team.away.last", "points.team.away.last", 
+                                             "wins.team.home", "losses.team.home", "team.series_leader", 
+                                             "is.video_available", "is.pt.available", "is.pt.xyz.available", 
+                                             "id.player", "fgm.catch.shoot", "fga.catch.shoot", "pct.fg.catch.shoot",
+                                             "pts.catch.shoot", "fg3m.catch.shoot", "fg3a.catch.shoot", "pct.fg3m.catch.shoot",
+                                             "pct.efg.catch.shoot", "fgm.def", "fga.def", "pct.fgm.def",
+                                             "drives", "fgm.drives", "fga.drives", "pct.fgm.drives",
+                                             "ftm.drives", "fta.drives", "pct.ftm.drives", "pts.drives",
+                                             "pct.pts.drives", "passes.drives", "pct.passes.drives",
+                                             "ast.drives", "pct.ast.drives", "tov.drives", "pct.tov.drives",
+                                             "pf.drives", "pct.pf.drives", "passes.made", "passes.received", "ast.ft",
+                                             "ast.secondary", "ast.potential", "ast.pts.created", "ast.adj", "pct.ast.pass",
+                                             "pct.adj.ast.pass",
+                                             "points", "touches", "touches.front.ct.",
+                                             "time.of.poss", "sec.per.touch", "drib.per.touch", "pts.per.touch",
+                                             "touches.elbow", "touches.post", "touches.paint", "pts.per.elbow", 
+                                             "pts.per.post", "pts.per.paint", "fgm.pullup", "fga.pullup", "pct.fg.pullup",
+                                             "fg3m.pullup", "fg3a.pullup", "pct.fg3m.pullup","pts.pullup",
+                                             "pct.efg.pullup", "oreb.contest", "oreb.uncontest", "pct.oreb.contest",
+                                             "oreb.chances", "pct.oreb.chance", "oreb.defer", "pct.oreb.adj.chance", "oreb.avg.dist",
+                                             "dreb.contest", "dreb.uncontest", "pct.dreb.contest", "dreb.chances", "pct.dreb.chance", 
+                                             "dreb.defer", "pct.dreb.adj.chance", "dreb.avg.dist", "reb.contest", "reb.uncontest", 
+                                             "pct.reb.contest", "reb.chances", "pct.reb.chance", "reb.defer", "pct.reb.adj.chance", 
+                                             "reb.avg.dist", "fgm.elbow", "fga.elbow", "pct.fgm.elbow",
+                                             "ftm.elbow", "fta.elbow", "pct.ftm.elbow", "pts.elbow",
+                                             "pct.pts.elbow", "passes.elbow", "pct.passes.elbow",
+                                             "ast.elbow", "pct.ast.elbow", "tov.elbow", "pct.tov.elbow",
+                                             "pf.post", "pct.pf.post", "fgm.post", "fga.post", "pct.fgm.post",
+                                             "ftm.post", "fta.post", "pct.ftm.post", "pts.post",
+                                             "pct.pts.post", "passes.post", "pct.passes.post",
+                                             "ast.post", "pct.ast.post", "tov.post", "pct.tov.post",
+                                             "pf.post", "pct.pf.post", "fgm.paint", "fga.paint", "pct.fgm.paint",
+                                             "ftm.paint", "fta.paint", "pct.ftm.paint", "pts.paint",
+                                             "pct.pts.paint", "passes.paint", "pct.passes.paint",
+                                             "ast.paint", "pct.ast.paint", "tov.paint", "pct.tov.paint",
+                                             "pf.paint", "pct.pf.paint"), id.row = 1:length(name.actual))
+    return(headers_df)
+  }
+  get_nba_franchise_data <- function (return_franchises = c("all", "active", "current"), return_message = T) {
+    team_history_url <- "http://stats.nba.com/stats/franchisehistory?LeagueID=00"
+    team_data <- team_history_url %>% fromJSON(simplifyDataFrame = T, 
+                                               flatten = )
+    names_active <- team_data$resultSets$headers[1] %>% unlist %>% 
+      str_to_lower
+    names_defunct <- team_data$resultSets$headers[2] %>% unlist %>% 
+      str_to_lower
+    active_data <- team_data$resultSets$rowSet[1] %>% data.frame %>% 
+      tbl_df()
+    names(active_data) <- names_active
+    active_data %<>% mutate(is.active = T)
+    defunct_data <- team_data$resultSets$rowSet[2] %>% data.frame %>% 
+      tbl_df()
+    names(defunct_data) <- names_defunct
+    defunct_data %<>% mutate(is.active = F)
+    data <- active_data %>% bind_rows(defunct_data)
+    num_cols <- data %>% dplyr::select(-c(contains("team")), 
+                                       -is.active) %>% names
+    data %<>% mutate_each_(funs(as.numeric), vars = num_cols)
+    if (return_franchises == "current") {
+      data %<>% mutate(id.row = 1:nrow(.)) %>% group_by(team_id) %>% 
+        dplyr::filter(id.row == min(id.row), is.active == 
+                        T) %>% dplyr::select(-id.row)
+    }
+    if (return_franchises == "active") {
+      data %<>% dplyr::filter(is.active == T)
+    }
+    if (return_message == T) {
+      "You got NBA franchise data" %>% message
+    }
+    return(data)
+  }
+  
+  if (year.season_start < 2013) {
+    stop("Sorry SportVU data only goes back to the 2013-14 Season")
+  }
+  if (!last_n_games %>% is.na) {
+    if (!last_n_games >= 0) {
+      stop("Last N games must be over 0")
+    }
+    last_n_games_stem <- last_n_games
+  }
+  else {
+    last_n_games_stem <- 0
+  }
+  if (!location %>% is.na) {
+    if (!location %in% c("Home", "Road")) {
+      stop("Sorry location can only be Home or Road")
+    }
+    location_stem <- location %>% str_replace("\\ ", "\\+") %>% str_replace("\\/", "\\2F") %>% str_replace("\\'", "%27")
+  }
+  else {
+    location_stem <- ""
+  }
+  if (opponent %>% length > 0 | team %>% length > 0) {
+    teams_ids <- get_nba_franchise_data(return_franchises = "current", return_message = F) %>% 
+      select(team_id, team_city, team_name) %>% 
+      ungroup %>% 
+      mutate(team = paste(team_city,team_name), team_id = team_id %>% as.numeric()) %>% 
+      tbl_df
+    nba_teams <- c("Atlanta Hawks", "St. Louis Hawks", "Milwaukee Hawks", 
+                   "Tri-Cities Blackhawks", "Boston Celtics", "Brooklyn Nets", 
+                   "New Jersey Nets", "New York Nets", "Charlotte Hornets", 
+                   "Charlotte Bobcats", "Chicago Bulls", "Cleveland Cavaliers", 
+                   "Dallas Mavericks", "Denver Nuggets", "Detroit Pistons", 
+                   "Ft. Wayne Zollner Pistons", "Golden State Warriors", 
+                   "San Francisco Warriors", "Philadelphia Warriors", 
+                   "Houston Rockets", "San Diego Rockets", "Indiana Pacers", 
+                   "Los Angeles Clippers", "San Diego Clippers", "Buffalo Braves", 
+                   "Los Angeles Lakers", "Minneapolis Lakers", "Memphis Grizzlies", 
+                   "Vancouver Grizzlies", "Miami Heat", "Milwaukee Bucks", 
+                   "Minnesota Timberwolves", "New Orleans Pelicans", 
+                   "New Orleans Hornets", "New Orleans/Oklahoma City Hornets", 
+                   "New York Knicks", "Oklahoma City Thunder", "Seattle SuperSonics", 
+                   "Orlando Magic", "Philadelphia 76ers", "Syracuse Nationals", 
+                   "Phoenix Suns", "Portland Trail Blazers", "Sacramento Kings", 
+                   "Kansas City Kings", "Kansas City-Omaha Kings", 
+                   "Cincinnati Royals", "Rochester Royals", "San Antonio Spurs", 
+                   "Toronto Raptors", "Utah Jazz", "New Orleans Jazz", 
+                   "Washington Wizards", "Washington Bullets", "Capital Bullets", 
+                   "Baltimore Bullets", "Chicago Zephyrs", "Chicago Packers", 
+                   "Anderson Packers", "Chicago Stags", "Cleveland Rebels", 
+                   "Detroit Falcons", "Indianapolis Jets", "Indianapolis Olympians", 
+                   "Pittsburgh Ironmen", "Providence Steamrollers", 
+                   "Sheboygan Redskins", "St. Louis Bombers", "Toronto Huskies", 
+                   "Washington Capitols", "Waterloo Hawks")
+  }
+  if (!opponent %>% is.na) {
+    if (!opponent %in% nba_teams) {
+      "Opponent must be either " %>% paste0(nba_teams %>% 
+                                              paste0(collapse = ", ")) %>% stop()
+    }
+    opponent_stem <- teams_ids %>%
+      mutate(team = team %>% str_to_lower()) %>% 
+      filter(team == opponent %>% str_to_lower()) %>% .$team_id
+  }
+  else {
+    opponent_stem <- 0
+  }
+  if (!outcome %>% is.na) {
+    Outcome = c("W", "L")
+    if (!outcome %in% Outcome) {
+      "Sorry outcome can only be " %>% paste0(Outcome %>% 
+                                                paste0(collapse = ", ")) %>% stop(call. = F)
+    }
+    outcome_stem <- outcome %>% str_replace("\\ ", "\\+") %>% str_replace("\\/","\\2F") %>% str_replace("\\'", "%27")
+  }
+  else {
+    outcome_stem <- ""
+  }
+  if (!per_mode %>% is.na) {
+    PerMode = c("Totals", "PerGame")
+    if (!per_mode %>% str_replace("\\ ", "\\+") %>% str_replace("\\/","\\2F") %>% str_replace("\\'", "%27") %in% PerMode) {
+      "Sorry per mode can only be " %>% paste0(per_mode %>% 
+                                                 paste0(collapse = ", ")) %>% stop(call. = F)
+    }
+    per_mode_stem <- per_mode %>% str_replace("\\ ", "\\+") %>% str_replace("\\/","\\2F") %>% str_replace("\\'", "%27")
+  }
+  else {
+    per_mode_stem <- "PerGame"
+  }
+  if (!type %>% is.na) {
+    PlayerOrTeamType = c("Player", "Team")
+    if (!type %in% PlayerOrTeamType) {
+      "Sorry measure type can only be " %>% paste0(PlayerOrTeamType %>% 
+                                                     paste0(collapse = ", ")) %>% stop(call. = F)
+    }
+    type_stem <- type %>% str_replace("\\ ", "\\+") %>% str_replace("\\/","\\2F") %>% str_replace("\\'", "%27")
+  }
+  else {
+    type_stem <- "Player"
+  }
+  if (!pt_measure_type %>% is.na) {
+    PtMeasureType = c("CatchShoot", "Defense", "Drives", "Passing", "Possessions", "PullUpShot", "Rebounding", 
+                      "Efficiency", "SpeedDistance", "ElbowTouch", "PostTouch", "PaintTouch")
+    if (!pt_measure_type %in% PtMeasureType) {
+      "Sorry measure type can only be " %>% paste0(PtMeasureType %>% 
+                                                     paste0(collapse = ", ")) %>% stop(call. = F)
+    }
+    pt_measure_type_stem <- pt_measure_type %>% str_replace("\\ ", "\\+") %>% str_replace("\\/","\\2F") %>% str_replace("\\'", "%27")
+  }
+  if (!season_type %>% is.na) {
+    SeasonType = c("Regular Season", "Playoffs", "All Star")
+    if (!season_type %in% SeasonType) {
+      "Sorry measure type can only be " %>% paste0(SeasonType %>% 
+                                                     paste0(collapse = ", ")) %>% stop(call. = F)
+    }
+    season_type_stem <- season_type %>% str_replace("\\ ", "\\+") %>% str_replace("\\/","\\2F") %>% str_replace("\\'", "%27")
+  }
+  else {
+    season_type_stem <- "Regular+Season"
+  }
+  if (!team %>% is.na) {
+    if (!team %in% nba_teams) {
+      "team must be either " %>% paste0(nba_teams %>% 
+                                          paste0(collapse = ", ")) %>% stop()
+    }
+    tn <- team
+    team_stem <- teams_ids %>% mutate(team = team %>% str_to_lower()) %>% 
+      dplyr::filter(team == tn %>% str_to_lower()) %>% 
+      .$team_id
+  }
+  else {
+    team_stem <- 0
+  }
+  
+  id.season <- year.season_start %>% paste0("-", (year.season_start + 1) %>% substr(3, 4))
+  base <- "http://stats.nba.com/stats/leaguedashptstats?College=&Conference=&Country=&DateFrom=&DateTo=&Division=&DraftPick=&DraftYear=&GameScope=&Height="
+  url_json <- base %>% paste0("&LastNGames=", last_n_games_stem, "&LeagueID=00", "&Location=", 
+                              location_stem, "&Month=0","&OpponentTeamID=", opponent_stem, "&Outcome=", 
+                              outcome_stem, "&PORound=0", "&PerMode=", per_mode_stem, "&PlayerExperience=", 
+                              "&PlayerOrTeam=", type_stem, "&PlayerPosition=", "&PtMeasureType=", 
+                              pt_measure_type_stem, "&Season=", id.season, "&SeasonSegment=", "&SeasonType=", 
+                              season_type_stem, "&StarterBench=", "&TeamID=", 
+                              team_stem, "&VsConference=", "&VsDivision=", "&Weight=", sep = "")
+  json_data <- fromJSON(url_json, simplifyDataFrame = T, flatten = T)
+  headers <- unlist(json_data$resultSets$headers)
+  data <- tbl_df(data.frame(json_data$resultSets$rowSet))
+  headers_df <- get_headers()
+  actual_names <- 1:length(headers) %>% 
+    map(function(x) data_frame(name.actual = headers_df %>% 
+                                 mutate(name.nba = name.nba) %>%
+                                 filter(name.nba == headers[x]) %>% .$name.actual)) %>% 
+    bind_rows()
+  names(data) <- actual_names$name.actual
+  if (type == "Player") {
+  num_cols <- select(data, -name.player, -slug.team) %>% names()
+  data %<>% mutate_each_(funs(extract_numeric(.)), vars = num_cols) %>% 
+    mutate(id.season, date.data = Sys.Date()) %>% 
+    select(id.season, everything())
+  message("You got " %>% paste0(pt_measure_type, " data for players in the ", id.season, " season"))
+  }
+  else {
+    num_cols <- select(data, -team, -slug.team) %>% names()
+    data %<>% mutate_each_(funs(extract_numeric(.)), vars = num_cols) %>% 
+      mutate(id.season, date.data = Sys.Date()) %>% 
+      select(id.season, team, everything())
+    message("You got " %>% paste0(pt_measure_type, " data for teams in the ", id.season, " season"))
+    
+  }
+  return(data)
+}
