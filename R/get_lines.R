@@ -95,9 +95,11 @@ get_lines <- function(year, type = 'both') {
   teams <- data.frame(team = c("Atlanta", "Boston",  "Brooklyn", "Charlotte", "Chicago", "Cleveland", "Dallas",  "Denver",  "Detroit",
                       "Golden State", "Houston", "Indiana", "L.A. Clippers", "L.A. Lakers", "Memphis", "Miami", "Milwaukee", "Minnesota", 
                       "New Orleans", "New York", "Oklahoma City", "Orlando", "Philadelphia", "Phoenix", "Portland", "Sacramento", "San Antonio", 
-                      "Toronto", "Utah","Washington"), slug.team = get_teams_ids()$slug.team)
+                      "Toronto", "Utah","Washington"), 
+                      slug.team = c("ATL", "BKN", "BOS", "CHA", "CHI", "CLE", "DAL", "DEN", "DET", "GSW", "HOU", "IND", "LAC", "LAL", "MEM", 
+                                    "MIA", "MIL", "MIN", "NOP", "NYK", "OKC", "ORL", "PHI", "PHX", "POR", "SAC", "SAS", "TOR", "UTA", "WAS"))
   
-  full.lines <- mutate(full.lines, date = as.Date(date, format = '%m/%d/%y'), team = teams$slug.team[match(home.team, teams$team)], 
+  full.lines <- mutate(full.lines, date = as.character(as.Date(date, format = '%m/%d/%y')), team = teams$slug.team[match(home.team, teams$team)], 
                        opp = gsub(pattern = "@ ", x = away.team, replacement = ""), opp = teams$slug.team[match(opp, teams$team)],
                        pts.scored = as.numeric(gsub('[^0-9]*([0-9]+)-([0-9]+)[^0-9]*', '\\1', score)),
                        pts.allowed = as.numeric(gsub('[^0-9]*([0-9]+)-([0-9]+)[^0-9]*', '\\2', score)),
