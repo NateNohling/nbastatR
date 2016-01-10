@@ -1,0 +1,215 @@
+get_nba_synergy_stats <- function (table_name = "Transition", include_defense = T, include_offense = T, type_table = "team", return_message = T) {
+  packages <- c("dplyr", "magrittr", "jsonlite", "tidyr", "purrr", "purrr", "stringr", "lubridate", "tidyr")
+  options(warn = -1)
+  lapply(packages, library, character.only = T)
+  get_header_names <- function(headers) {
+    headers_df <- get_headers()
+    actual_names <- 1:length(headers) %>%
+      map(function(x) data_frame(name.actual = headers_df %>% 
+                                   mutate(name.nba = name.nba) %>% dplyr::filter(name.nba == headers[x]) %>% .$name.actual)) %>% 
+      bind_rows()
+    actual_headers <- actual_names
+    return(actual_headers)
+  }
+  get_synergy_headers <- function () {
+    synergy_option_df <- data_frame(name.table = c("Post-Up", 
+                                                   "Pick & Roll, Ball Handler", "Cut", "Handoff", "Isolation", 
+                                                   "Miscellanous", "Off Screen", "Offensive Rebounds", 
+                                                   "Pick & Roll, Roll Man", "Spot-Up", "Transition"), stem.table = c("Postup", 
+                                                                                                                     "PRBallHandler", "Cut", "Handoff", "Isolation", "Misc", 
+                                                                                                                     "OffScreen", "OffRebound", "PRRollMan", "Spotup", "Transition"))
+    header_df <- data_frame(name.nba = c("GP", "Poss", "Time", 
+                                         "Points", "FGA", "FGM", "PPP", "WorsePPP", "BetterPPP", 
+                                         "TeamIDSID", "TeamName", "TeamNameAbbreviation", "TeamShortName", 
+                                         "PossG", "PPG", "FGAG", "FGMG", "FGmG", "FGm", "FG", 
+                                         "aFG", "FT", "TO", "SF", "PlusOne", "Score", "PlayerIDSID", 
+                                         "PlayerFirstName", "PlayerLastName", "PlayerNumber", 
+                                         "P"), name.actual = c("gp", "possesions", "pct.play_type", 
+                                                               "pts", "fga", "fgm", "ppp", "ppp.worse", "ppp.better", 
+                                                               "id.team", "team", "slug.team", "city.team", "possesions.per_game", 
+                                                               "pts.per_game", "fga.per_game", "fgm.per_game", "fg.miss.per_game", 
+                                                               "rank", "pct.fg", "pct.efg", "pct.ft_achieved", "pct.to", 
+                                                               "pct.shooting_foul", "pct.and_1", "pct.scored", "id.player", 
+                                                               "name.first", "name.last", "jersey", "id.position"))
+    data <- list(synergy_option_df, header_df)
+    names(data) <- c("options", "headers")
+    return(data)
+  }
+  get_nba_players_ids <- function(active_only = F) {
+    packages <- c("dplyr", "magrittr", "jsonlite", "tidyr", 
+                  "purrr", "stringr", "lubridate", "tidyr")
+    options(warn = -1)
+    lapply(packages, library, character.only = T)
+    players.url <- "http://stats.nba.com/stats/commonallplayers/?LeagueID=00&Season=2015-16&IsOnlyCurrentSeason=0"
+    json_data <- fromJSON(players.url, simplifyDataFrame = T)
+    data <- tbl_df(data.frame(json_data$resultSets$rowSet))
+    headers <- unlist(json_data$resultSets$headers) %>% 
+      str_to_lower()
+    headers_df <- get_headers()
+    actual_names <- 1:length(headers) %>%
+      map(function(x) data_frame(name.actual = headers_df %>% 
+                                   mutate(name.nba = name.nba %>% str_to_lower) %>%
+                                   filter(name.nba == headers[x]) %>% .$name.actual)) %>% 
+      bind_rows()
+    names(data) <- actual_names$name.actual
+    names_df <- tbl_df(data.frame(str_split_fixed(data$name.last.display, pattern = "\\,", 2)))
+    names(names_df) <- c("name.last", "name.first")
+    names_df <- mutate(names_df, player = name.first %>% 
+                         str_trim %>% paste(name.last %>% str_trim)) %>% 
+      select(player)
+    data$name.player <- names_df$player
+    data <- mutate(data, id.player = id.player %>% as.character %>% as.numeric, is.active_player = ifelse(id.team == 0, FALSE, TRUE),
+                   id.team = id.team %>% as.numeric) %>% select(-c(status.roster,name.last.display)) %>% 
+      mutate_each(funs(extract_numeric),starts_with("year.")) %>% 
+      mutate(id.team = ifelse(id.team == 0, NA, id.team), name.player = name.player %>% str_trim,city.team = ifelse(city.team == "", NA, city.team),
+             code.team = ifelse(code.team == "", NA, code.team), slug.team = ifelse(slug.team == "", NA, slug.team),
+             team = ifelse(city.team %>% is.na, NA, paste(city.team,team)), seasons.played = year.to - year.from, 
+             url.player = id.player %>% paste0("http://stats.nba.com/player/#!/",.), 
+             image.player = id.player %>% paste0("http://stats.nba.com/media/players/132x132/",., ".png")) %>% 
+      select(name.player, id.player,team, id.team, is.active_player, seasons.played,year.from, year.to, everything())
+    if (active_only == T) {
+      data <- filter(data, is.active_player == T)
+    }
+    return(data)
+  }
+  height_in_inches <- function(height) {
+    height_ft_in <- height %>% str_split("-") %>% unlist %>% 
+      as.numeric()
+    height_in <- height_ft_in[1] * 12 + height_ft_in[2]
+    return(height_in)
+  }
+  get_player_profile <- function(player, id.player = NULL, include_headline_stat = T, return_message = T) {
+    packages <- packages <- c("dplyr", "magrittr", "jsonlite", 
+                              "tidyr", "purrr", "stringr", "lubridate", "tidyr")
+    options(warn = -1)
+    lapply(packages, library, character.only = T)
+    players <- get_nba_players_ids()
+    if (id.player %>% is.null()) {
+      id.player <- players %>% filter(name.player == 
+                                        player) %>% .$id.player
+    }
+    else {
+      id <- id.player
+      player <- players %>% filter(id.player == 
+                                     id) %>% .$name.player
+    }
+    active_player <- players %>% filter(id.player == 
+                                          id) %>% .$is.active
+    url_json <- "http://stats.nba.com/stats/commonplayerinfo?LeagueID=00&PlayerID=" %>% 
+      paste0(id.player)
+    json_data <- url_json %>% fromJSON(simplifyDataFrame = T, 
+                                       flatten = T)
+    headers_df <- get_headers()
+    headers <- json_data$resultSets$headers[1] %>% unlist %>% 
+      str_to_lower()
+    data <- json_data$resultSets$rowSet[1] %>% data.frame %>% 
+      tbl_df
+    actual_names <- 1:length(headers) %>% purrr::map(function(x) data_frame(name.actual = headers_df %>% 
+                                                                              mutate(name.nba = name.nba %>% str_to_lower) %>% 
+                                                                              filter(name.nba == headers[x]) %>% .$name.actual)) %>% 
+      bind_rows()
+    names(data) <- actual_names$name.actual
+    data %<>% separate(date.birth, into = c("date.birth", 
+                                            "ignore"), sep = "T") %>% select(-c(name.first, 
+                                                                                name.last, name.last.display, name.middle.display, 
+                                                                                gp.flag, ignore, status.roster)) %>% mutate(is.rookie = ifelse(years.experience == 
+                                                                                                                                                 "R", T, F), years.experience = years.experience %>% 
+                                                                                                                              str_replace("R", 0) %>% as.numeric(), id.team = id.team %>% 
+                                                                                                                              as.numeric, jersey = jersey %>% as.numeric, height.inches = height %>% 
+                                                                                                                              lapply(height_in_inches) %>% unlist, weight.lbs = weight.lbs %>% 
+                                                                                                                              as.numeric, date.birth = date.birth %>% ymd %>% 
+                                                                                                                              as.Date(), id.player = id.player %>% as.numeric, 
+                                                                                                                            is.active_player = active_player, team = city.team %>% 
+                                                                                                                              paste0(team), bmi = (weight.lbs/height.inches^2) * 
+                                                                                                                              703, has.d_league_data = has.d_league_data %>% 
+                                                                                                                              str_detect("Y")) %>% select(name.player, 
+                                                                                                                                                          id.player, is.rookie, is.active_player, team, position, 
+                                                                                                                                                          jersey, height, height.inches, weight.lbs, bmi, 
+                                                                                                                                                          years.experience, year.from, year.to, everything())
+    if (include_headline_stat == T) {
+      headers <- json_data$resultSets$headers[2] %>% unlist %>% 
+        str_to_lower()
+      stat <- json_data$resultSets$rowSet[2] %>% data.frame %>% 
+        tbl_df
+      actual_names <- 1:length(headers) %>% purrr::map(function(x) data_frame(name.actual = headers_df %>% 
+                                                                                mutate(name.nba = name.nba %>% str_to_lower) %>% 
+                                                                                filter(name.nba == headers[x]) %>% .$name.actual)) %>% 
+        bind_rows()
+      names(stat) <- actual_names$name.actual
+      stat %<>% mutate_each_(funs(extract_numeric), vars = stat %>% 
+                               select(id.player, pts:pie) %>% names) %>% 
+        rename(id.season.recent = id.season)
+      names(stat)[4:length(names(stat))] %<>% paste0(".per_game.recent")
+      data <- stat %>% left_join(data)
+    }
+    if (return_message == T) {
+      "Congrats, you got " %>% paste0(player, "'s profile data") %>% 
+        message()
+    }
+    return(data)
+  }
+  packages <- c("dplyr", "magrittr", "jsonlite", "tidyr", "purrr", "purrr", "stringr", "lubridate", "tidyr")
+  options(warn = -1)
+  lapply(packages, library, character.only = T)
+  if (!type_table %>% str_to_lower() %in% c("team", "player")) {
+    stop("Sorry type of table can only be team or player", 
+         call. = F)
+  }
+  names.table <- c("Post-Up", "Pick & Roll, Ball Handler", "Cut", "Handoff", "Isolation", "Miscellanous", "Off Screen", "Offensive Rebounds", 
+                   "Pick & Roll, Roll Man", "Spot-Up", "Transition")
+  if (!table_name %in% names.table) {
+    "Sorry must be either " %>% paste0(names.table %>% paste0(collapse = ", ")) %>% 
+      stop(call. = F)
+  }
+  table_metadata <- get_synergy_headers()
+  headers_df <- table_metadata$headers
+  synergy_option_df <- table_metadata$options
+  stem <- filter(synergy_option_df, name.table == table_name)$stem.table
+  base <- "http://stats.nba.com/js/data/playtype/"
+  if (type_table %>% str_to_lower == "team") {
+    type <- "team_"
+  }
+  else {
+    type <- "player_"
+  }
+  url.json <- paste0(base, type, stem, ".js")
+  json_data <- fromJSON(url.json, simplifyDataFrame = T, flatten = T)
+  headers <- unlist(json_data$resultSets$headers[1])
+  data <- tbl_df(data.frame(json_data$resultSets$rowSet[1]))
+  actual_names <- 1:length(headers) %>% map(function(x) data_frame(name.actual = headers_df %>% 
+                                                                     filter(name.nba == headers[x]) %>% .$name.actual)) %>% bind_rows()
+  names(data) <- actual_names$name.actual
+  num_vars <- names(data)[!names(data) %in% c("slug.team", "team", "city.team", "id.position", "name.first", "name.last","id.team", "jersey")]
+  data <- mutate_each_(data, funs(extract_numeric(.) %>% round(2)), vars = num_vars) %>% 
+    mutate(is.offense = T, name.table = table_name,id.season = "2015-16", id.team = id.team %>% as.numeric, stem.table = stem, 
+           percentile = round(ppp.worse/max(ppp.worse)*100,2)) %>% 
+    select(name.table, id.season, is.offense, team, everything())
+  
+  if (include_defense == T) {
+    if (tbl_df(data.frame(json_data$resultSets$rowSet[2])) %>% nrow() > 0) {
+      defense <- tbl_df(data.frame(json_data$resultSets$rowSet[2]))
+      names(defense) <- actual_names$name.actual
+      num_vars <- names(defense)[!names(defense) %in% c("slug.team", "team", "city.team", "id.position","name.first", "name.last", "id.team", "jersey")]
+      defense <- mutate_each_(defense, funs(extract_numeric(.) %>% round(2)), vars = num_vars)
+      defense <- mutate_each_(defense, funs(extract_numeric(.) %>% round(2)), vars = num_vars) %>% 
+        mutate(is.offense = F, name.table = table_name, id.season = "2015-16", id.team = id.team %>% as.numeric(), stem.table = stem, 
+               percentile = round(ppp.worse/max(ppp.worse)*100,2)) %>% 
+        select(name.table, id.season, is.offense, team, everything())
+      data <- data %>% bind_rows(defense) %>% arrange(team)
+    }
+  }
+  if (type_table %>% str_to_lower() == "player") {
+    data %<>% mutate(name.player = name.first %>% paste(name.last) %>% 
+                       str_trim, id.player = id.player %>% as.numeric, 
+                     jersey = jersey %>% as.numeric, percentile = round(ppp.worse/max(ppp.worse)*100,2)) %>% 
+      select(-c(name.first, name.last)) %>% select(name.table, id.season, id.position, is.offense, name.player, team, everything())
+  }
+  if (include_offense == F) {
+    data %<>% filter(is.offense == F)
+  }
+  if (return_message == T) {
+    "Congrats you pulled in Synergy data for " %>% paste0(table_name %>% 
+                                                            str_to_lower, " for ", type_table, "s") %>% message
+  }
+  return(data)
+}
